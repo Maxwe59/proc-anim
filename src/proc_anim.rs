@@ -37,7 +37,6 @@ pub struct DynamicBody {
     seg_lengths: Vec<f32>, //length between segments, vec length should be seg_count - 1
     nodes: Vec<Entity>,    //vec length should be seg_count - 1
     angle_constraints: f32,
-    lerp_speed: f32,
     anchor_entity: Entity,
     slope_func: fn(i32, Vec3) -> Vec3,
 }
@@ -62,10 +61,12 @@ pub struct FabrikJoint {
     seg_lengths: Vec<f32>,
     nodes: Vec<Entity>,
     max_target_dist: f32, //max distance target (foot) can get from target_pos (global space)
-    lerp_speed: f32,
+    step_speed: f32, //how fast foot lerps from one place to another
     target_offset: Vec3,   //relative to anchor position (segments[0]),
     anchor_entity: Entity, //entity the fabrik joint is anchored to.
     angle_constraints: Vec<f32>,
+    init_dir_vec: Vec3, //initial vector that compares for angle constraints. relative to anchor entity
+
     //interal variables used to calculate states
     fabrik_iterations: i32,
     stepping: bool,        //when joint is stepping phase
@@ -85,17 +86,19 @@ pub struct FabrikSync {
 
 impl_new!(SegmentFiller, nodes: Vec<Entity>, midpoints: Vec<Entity>, vec_dir_segment: Vec3);
 impl_new!(PivotEntity, head: Entity, offset: Vec3, child: Entity);
-impl_new!(DynamicBody, seg_lengths: Vec<f32>, nodes: Vec<Entity>, angle_constraints: f32, lerp_speed: f32, anchor_entity: Entity, slope_func: fn(i32, Vec3) -> Vec3);
+impl_new!(DynamicBody, seg_lengths: Vec<f32>, nodes: Vec<Entity>, angle_constraints: f32, anchor_entity: Entity, slope_func: fn(i32, Vec3) -> Vec3);
 impl_new!(FabrikSync, [left_joint: Entity, right_joint: Entity], [current_joint = false] );
 
 impl_new!(FabrikJoint, [
         seg_lengths: Vec<f32>,
         nodes: Vec<Entity>,
         max_target_dist: f32,
-        lerp_speed: f32,
+        step_speed: f32,
         target_offset: Vec3,
         anchor_entity: Entity,
-        angle_constraints: Vec<f32>],
+        angle_constraints: Vec<f32>,
+        init_dir_vec: Vec3
+        ],
         
         [fabrik_iterations = 5, 
         stepping = false, 
@@ -139,7 +142,6 @@ fn calc_angle_constraints(
     front_pos: Vec3,
     back_pos: Vec3,
     angle_constraint: f32,
-    lerp_speed: f32,
     segment_length: f32,
 ) -> (Vec3, Vec3) {
     let current_vec = (back_pos - front_pos).normalize();
@@ -147,9 +149,8 @@ fn calc_angle_constraints(
     if angle > angle_constraint {
         let axis = current_vec.cross(prev_vec).normalize();
         let new_vec = Quat::from_axis_angle(axis, angle - angle_constraint) * current_vec;
-        let new_pos = front_pos + (new_vec * segment_length);
-        let final_lerp = back_pos.lerp(new_pos, lerp_speed);
-        return (new_vec, final_lerp);
+        let new_pos: Vec3 = front_pos + (new_vec * segment_length);
+        return (new_vec, new_pos);
     } else {
         return (current_vec, back_pos);
     }
@@ -216,7 +217,6 @@ pub fn dynamic_body_calculator(
                 front_pos,
                 back_pos,
                 dynamic_body.angle_constraints,
-                dynamic_body.lerp_speed,
                 segment_lengths[i],
             );
             transforms.get_mut(nodes[i + 1]).unwrap().translation = new_pos;
@@ -308,7 +308,7 @@ pub fn fabrik_calculator(
         if fabrik_joint.stepping {
             //recalculate currentmost target (because teh entire body is moving, using old target will result in incomplete step)
             fabrik_joint.new_target_pos = updated_target;
-            fabrik_joint.t_val += fabrik_joint.lerp_speed;
+            fabrik_joint.t_val += fabrik_joint.step_speed;
             fabrik_joint.curr_target_pos = fabrik_joint
                 .curr_target_pos
                 .lerp(fabrik_joint.new_target_pos, fabrik_joint.t_val);

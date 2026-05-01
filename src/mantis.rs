@@ -105,7 +105,6 @@ pub fn create_mantis(
             seg_lens,
             segments.clone(),
             10.0 * std::f32::consts::PI / 180.0,
-            0.8,
             head_id,
             linear_downset,
         ),
@@ -156,6 +155,7 @@ pub fn create_mantis(
                     Vec3::new(0.4 * m, -0.2, -0.3),
                     both_offset_entities[i],
                     rad_constraints.clone(),
+                    Vec3::ZERO
                 ),
             ))
             .id();
