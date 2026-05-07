@@ -1,4 +1,4 @@
-use bevy::{math::NormedVectorSpace, prelude::*};
+use bevy::prelude::*;
 
 macro_rules! impl_new {
     //all manual values, you must manually fill all fields
@@ -419,10 +419,7 @@ fn midpoint_filler(
         let entity_list = &segment_filler.nodes;
         let midpoint_entity_list = &segment_filler.midpoints; //will be len(entity_list)-1 length
         for i in 0..(midpoint_entity_list.len()) {
-            let pos1 = global_transforms
-                .get(entity_list[i])
-                .unwrap()
-                .translation();
+            let pos1 = global_transforms.get(entity_list[i]).unwrap().translation();
             let pos2 = global_transforms
                 .get(entity_list[i + 1])
                 .unwrap()

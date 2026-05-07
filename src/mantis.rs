@@ -11,6 +11,27 @@ macro_rules! spawn_basic {
     };
 }
 
+macro_rules! spawn_batch_ids {
+    ($amt:expr, $commands:expr, $meshes:expr, $materials:expr, $mesh:expr, $color:expr) => {{
+        let mut return_vec: Vec<Entity> = Vec::new();
+        let mesh_handle = $meshes.add($mesh);
+        let material_handle = $materials.add($color);
+
+        for i in 0..$amt {
+            let entity_id = $commands
+                .spawn((
+                    Mesh3d(mesh_handle.clone()),
+                    MeshMaterial3d(material_handle.clone()),
+                    Transform::from_translation(Vec3::new(i as f32, 0.0, 0.0)),
+                ))
+                .id();
+            return_vec.push(entity_id);
+        }
+
+        return_vec
+    }};
+}
+
 #[derive(Component)]
 pub struct Mantis {
     pub speed: f32,
@@ -78,28 +99,23 @@ pub fn create_mantis(
 
     //create dynamic body
     let seg_lens = vec![0.2; 5];
-    let mut segments = Vec::new();
-    let mut midpoint_segments = Vec::new();
-    for i in 0..seg_lens.len() + 1 {
-        let segment_id = commands
-            .spawn((
-                Mesh3d(meshes.add(Sphere::new(0.1))),
-                MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-                Transform::from_xyz(i as f32, 0.5, 0.0),
-            ))
-            .id();
-        segments.push(segment_id);
+    let segments = spawn_batch_ids!(
+        seg_lens.len() + 1,
+        commands,
+        meshes,
+        materials,
+        Sphere::new(0.1),
+        Color::srgb_u8(124, 144, 255)
+    );
+    let midpoint_segments = spawn_batch_ids!(
+        seg_lens.len(),
+        commands,
+        meshes,
+        materials,
+        Cylinder::new(0.09, seg_lens[0]),
+        Color::srgb_u8(255, 124, 144)
+    );
 
-        if (i < seg_lens.len()) {
-            let midpoint_id = commands
-                .spawn((
-                    Mesh3d(meshes.add(Cylinder::new(0.09, seg_lens[i]))),
-                    MeshMaterial3d(materials.add(Color::srgb_u8(255, 124, 144))),
-                ))
-                .id();
-            midpoint_segments.push(midpoint_id);
-        }
-    }
     commands.spawn((
         DynamicBody::new(
             seg_lens,
