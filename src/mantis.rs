@@ -2,27 +2,34 @@ use crate::proc_anim::{DynamicBody, FabrikJoint, FabrikSync, PivotEntity, Segmen
 use bevy::prelude::*;
 
 macro_rules! spawn_basic {
-    ($commands:expr, $meshes:expr, $materials:expr, $mesh:expr, $color:expr, $pos:expr) => {
+    ($commands:expr, $pos:expr $(, $meshes:expr, $materials:expr, $mesh:expr, $color:expr)?) => {
         $commands.spawn((
-            Mesh3d($meshes.add($mesh)),
-            MeshMaterial3d($materials.add($color)),
             Transform::from_translation($pos),
+            $(
+                Mesh3d($meshes.add($mesh)),
+                MeshMaterial3d($materials.add($color)),
+            )?
         ))
     };
 }
 
 macro_rules! spawn_batch_ids {
-    ($amt:expr, $commands:expr, $meshes:expr, $materials:expr, $mesh:expr, $color:expr) => {{
+    ($amt:expr, $commands:expr, $meshes:expr, $materials:expr, $mesh:expr, $color:expr, $has_spacing:expr) => {{
         let mut return_vec: Vec<Entity> = Vec::new();
         let mesh_handle = $meshes.add($mesh);
         let material_handle = $materials.add($color);
 
         for i in 0..$amt {
+            let pos = if $has_spacing {
+                Vec3::new(i as f32, 0.0, 0.0)
+            } else {
+                Vec3::ZERO
+            };
             let entity_id = $commands
                 .spawn((
                     Mesh3d(mesh_handle.clone()),
                     MeshMaterial3d(material_handle.clone()),
-                    Transform::from_translation(Vec3::new(i as f32, 0.0, 0.0)),
+                    Transform::from_translation(pos),
                 ))
                 .id();
             return_vec.push(entity_id);
@@ -33,26 +40,8 @@ macro_rules! spawn_batch_ids {
 }
 
 #[derive(Component)]
-pub struct Mantis {
+pub struct CenterOfMass {
     pub speed: f32,
-    init_center_of_mass: Vec3,
-    //include color, and scale factors here later
-}
-
-impl Mantis {
-    pub fn init_bundle(&self) -> impl Bundle {
-        return (
-            /*
-            Mantis {
-                speed: 5.0,
-                init_center_of_mass: self.init_center_of_mass,
-            },
-            Mesh3d(meshes.add(Sphere::new(0.1))),
-            MeshMaterial3d(materials.add(Color::srgb_u8(255, 255, 255))),
-            Transform::from_xyz(center_of_mass.x, center_of_mass.y, center_of_mass.z),
-             */
-        );
-    }
 }
 
 fn linear_downset(i: i32, prev_vec: Vec3) -> Vec3 {
@@ -69,26 +58,23 @@ pub fn create_mantis(
 
     let head_id = spawn_basic!(
         commands,
+        center_of_mass,
         meshes,
         materials,
         Sphere::new(0.1),
-        Color::srgb_u8(255, 255, 255),
-        center_of_mass
+        Color::srgb_u8(255, 255, 255)
     )
-    .insert(Mantis {
-        speed: 4.0,
-        init_center_of_mass: center_of_mass,
-    })
+    .insert((CenterOfMass { speed: 4.0 },))
     .id();
 
     //static head
     let static_head = spawn_basic!(
         commands,
+        Vec3::ZERO,
         meshes,
         materials,
         Sphere::new(0.1),
-        Color::srgb_u8(255, 255, 255),
-        Vec3::ZERO
+        Color::srgb_u8(255, 255, 255)
     )
     .id();
     commands.spawn(PivotEntity::new(
@@ -104,8 +90,9 @@ pub fn create_mantis(
         commands,
         meshes,
         materials,
-        Sphere::new(0.1),
-        Color::srgb_u8(124, 144, 255)
+        Sphere::new(0.01),
+        Color::srgb_u8(124, 144, 255),
+        true
     );
     let midpoint_segments = spawn_batch_ids!(
         seg_lens.len(),
@@ -113,7 +100,8 @@ pub fn create_mantis(
         meshes,
         materials,
         Cylinder::new(0.09, seg_lens[0]),
-        Color::srgb_u8(255, 124, 144)
+        Color::srgb_u8(255, 124, 144),
+        true
     );
 
     commands.spawn((
@@ -136,24 +124,36 @@ pub fn create_mantis(
 
     let seg_lens = vec![0.2, 0.2, 0.2];
     let mut both_segments: [Vec<Entity>; 2] = [Vec::new(), Vec::new()];
+    let mut both_midpoints = [Vec::new(), Vec::new()];
     let mut both_offset_entities: [Entity; 2] = [Entity::PLACEHOLDER; 2];
     for j in 0..2 {
-        for i in 0..seg_lens.len() + 1 {
-            let segment_id = commands
-                .spawn((
-                    Mesh3d(meshes.add(Sphere::new(0.1))),
-                    MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-                    Transform::from_xyz(i as f32, 0.5, 0.0),
-                ))
-                .id();
-            both_segments[j].push(segment_id);
-        }
-        let offset_entity = commands
-            .spawn((
-                Mesh3d(meshes.add(Sphere::new(0.1))),
-                MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-            ))
-            .id();
+        both_segments[j] = spawn_batch_ids!(
+            seg_lens.len() + 1,
+            commands,
+            meshes,
+            materials,
+            Sphere::new(0.01),
+            Color::srgb_u8(124, 144, 255),
+            true
+        );
+        both_midpoints[j] = spawn_batch_ids!(
+            seg_lens.len(),
+            commands,
+            meshes,
+            materials,
+            Cylinder::new(0.07, seg_lens[0]),
+            Color::srgb_u8(255, 124, 144),
+            true
+        );
+        let offset_entity = spawn_basic!(
+            commands,
+            Vec3::ZERO,
+            meshes,
+            materials,
+            Sphere::new(0.07),
+            Color::srgb_u8(124, 144, 255)
+        )
+        .id();
         both_offset_entities[j] = offset_entity;
     }
 
@@ -177,6 +177,7 @@ pub fn create_mantis(
                     rad_constraints.clone(),
                     Vec3::new(0.0, -1.0, 0.0),
                 ),
+                SegmentFiller::new(both_segments[i].clone(), both_midpoints[i].clone(), Vec3::Y),
             ))
             .id();
         fabriks[i] = fabrik;

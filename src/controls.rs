@@ -1,4 +1,4 @@
-use crate::mantis::Mantis;
+use crate::mantis::CenterOfMass;
 use crate::{MovementMode, WorldOptions};
 use bevy::prelude::*;
 
@@ -23,7 +23,7 @@ pub fn controls_plugin(app: &mut App) {
 }
 
 pub fn keyboard_controls(
-    mut mantis: Single<(&mut Transform, &Mantis)>,
+    mut mantis: Single<(&mut Transform, &CenterOfMass)>,
     input: Res<ButtonInput<KeyCode>>,
     mode: Res<WorldOptions>,
     time: Res<Time>,
@@ -48,7 +48,7 @@ pub fn keyboard_controls(
 }
 
 pub fn mouse_controls(
-    mut mantis: Single<(&mut Transform, &Mantis)>,
+    mut mantis: Single<(&mut Transform, &CenterOfMass)>,
     world_options: Res<WorldOptions>,
     camera_query: Single<(&Camera, &GlobalTransform)>,
     window: Single<&Window>,
@@ -85,7 +85,7 @@ pub fn mouse_controls(
 }
 
 pub fn auto_movement(
-    mut mantis: Single<&mut Transform, With<Mantis>>,
+    mut mantis: Single<&mut Transform, With<CenterOfMass>>,
     mut world_options: ResMut<WorldOptions>,
     time: Res<Time>,
 ) {
@@ -116,7 +116,7 @@ pub fn switch_movement_mode(mut mode: ResMut<WorldOptions>, input: Res<ButtonInp
 pub fn legacy_controls(
     mode: Res<WorldOptions>,
     input: Res<ButtonInput<KeyCode>>,
-    mut mantis_params: Single<(&mut Transform, &Mantis)>,
+    mut mantis_params: Single<(&mut Transform, &CenterOfMass)>,
     time: Res<Time>,
 ) {
     if mode.movement_mode != MovementMode::Legacy {
