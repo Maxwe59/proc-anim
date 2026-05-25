@@ -120,7 +120,7 @@ pub fn procedural_animation_plugin(app: &mut App) {
             fabrik_syncer,
             midpoint_filler,
         )
-            .chain()
+            .chain(),
     );
 }
 
@@ -415,21 +415,26 @@ pub fn fabrik_calculator(
 
 fn midpoint_filler(
     segment_fillers: Query<&SegmentFiller>,
-    global_transforms: Query<&GlobalTransform>,
-    mut transforms: Query<&mut Transform>,
+    mut param_set: ParamSet<(TransformHelper, Query<&mut Transform>)>,
 ) {
     for segment_filler in segment_fillers.iter() {
         let entity_list = &segment_filler.nodes;
         let midpoint_entity_list = &segment_filler.midpoints; //will be len(entity_list)-1 length
         for i in 0..(midpoint_entity_list.len()) {
-            let pos1 = global_transforms.get(entity_list[i]).unwrap().translation();
-            let pos2 = global_transforms
-                .get(entity_list[i + 1])
+            let pos1 = param_set
+                .p0()
+                .compute_global_transform(entity_list[i])
+                .unwrap()
+                .translation();
+            let pos2 = param_set
+                .p0()
+                .compute_global_transform(entity_list[i + 1])
                 .unwrap()
                 .translation();
             let midpoint = (pos1 + pos2) / 2.0;
             let dir = (pos1 - pos2).normalize();
-            let mut midpoint_entity = transforms.get_mut(midpoint_entity_list[i]).unwrap();
+            let mut transform = param_set.p1();
+            let mut midpoint_entity = transform.get_mut(midpoint_entity_list[i]).unwrap();
 
             //set midpoint entity to midpoint between pos1 and pos2
             midpoint_entity.translation = midpoint;
