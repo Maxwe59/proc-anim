@@ -215,3 +215,14 @@ breathing effect
 
 
 */
+
+/*
+//create center of mass
+//create abdomen, spawn point entities with no mesh/material, spawn segment midpoints
+//create thorax. just a static offset from the center of mass (in front)
+//create 2 legs, use angle restrictions to create. spawn in the points and spawn in the midpoint segs
+//create static head. create antenae with dynamic body
+//craete claws, try to use fabrik, if not static is fine. probably static first then figure out how to use fabrik last
+
+
+*/

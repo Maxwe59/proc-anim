@@ -154,16 +154,7 @@ fn calc_angle_constraints(
     }
 }
 
-/*
-returns true if vector is within angle limits, false if the 2 vectors are too far apart angularly
-*/
-fn check_angle_constraint(angle_constraint: f32, vec1: Vec3, vec2: Vec3) -> bool {
-    let angle = vec1.angle_between(vec2);
-    if angle > angle_constraint {
-        return false;
-    }
-    return true;
-}
+
 
 pub fn setup_offset(
     pivot_query: Query<&PivotEntity>,
