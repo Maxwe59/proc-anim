@@ -38,7 +38,7 @@ pub struct DynamicBody {
     nodes: Vec<Entity>,    //vec length should be seg_count - 1
     angle_constraints: Vec<f32>,
     anchor_entity: Entity,
-    slope_func: fn(i32, Vec3) -> Vec3,
+    slope_func: fn(i32, Vec3) -> [Option<f32>; 3],
     init_dir_vec: Vec3, //used to determine forward vector of the first node in the chain
 }
 
@@ -87,7 +87,7 @@ pub struct FabrikSync {
 
 impl_new!(SegmentFiller, nodes: Vec<Entity>, midpoints: Vec<Entity>, vec_dir_segment: Vec3);
 impl_new!(PivotEntity, head: Entity, offset: Vec3, child: Entity);
-impl_new!(DynamicBody, seg_lengths: Vec<f32>, nodes: Vec<Entity>, angle_constraints: Vec<f32>, anchor_entity: Entity, slope_func: fn(i32, Vec3) -> Vec3, init_dir_vec: Vec3);
+impl_new!(DynamicBody, seg_lengths: Vec<f32>, nodes: Vec<Entity>, angle_constraints: Vec<f32>, anchor_entity: Entity, slope_func: fn(i32, Vec3) -> [Option<f32>;3], init_dir_vec: Vec3);
 impl_new!(FabrikSync, [left_joint: Entity, right_joint: Entity], [current_joint = false] );
 
 impl_new!(FabrikJoint, [
@@ -224,14 +224,14 @@ pub fn dynamic_body_calculator(
             //apply segment offset
             let offset = transform_func(i as i32, last_node_pos);
             let mut node_transform = transforms.get_mut(nodes[i + 1]).unwrap();
-            if offset.x != 0.0 {
-                node_transform.translation.x = offset.x;
+            if let Some(x) = offset[0] {
+                node_transform.translation.x = x;
             }
-            if offset.y != 0.0 {
-                node_transform.translation.y = offset.y;
+            if let Some(y) = offset[1] {
+                node_transform.translation.y = y;
             }
-            if offset.z != 0.0 {
-                node_transform.translation.z = offset.z;
+            if let Some(z) = offset[2] {
+                node_transform.translation.z = z;
             }
 
             //apply distance constraints LAST

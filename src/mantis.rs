@@ -54,8 +54,8 @@ pub struct CenterOfMass {
     pub speed: f32,
 }
 
-fn linear_downset(i: i32, prev_vec: Vec3) -> Vec3 {
-    return Vec3::new(0.0, prev_vec.y - 0.1, 0.0);
+fn linear_downset(i: i32, prev_vec: Vec3) -> [Option<f32>; 3] {
+    return [None, Some(prev_vec.y - 0.1), None];
 }
 
 pub fn create_mantis(
@@ -122,7 +122,7 @@ pub fn create_mantis(
             angle_constraints,
             head_id,
             linear_downset,
-            Vec3::new(0.0, 0.0, 1.0)
+            Vec3::new(0.0, 0.0, 1.0),
         ),
         SegmentFiller::new(segments.clone(), midpoint_segments, Vec3::Y),
     ));
