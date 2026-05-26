@@ -113,14 +113,16 @@ pub fn create_mantis(
         Color::srgb_u8(255, 124, 144),
         true
     );
+    let angle_constraints = vec![10.0 * std::f32::consts::PI / 180.0; seg_lens.len()];
 
     commands.spawn((
         DynamicBody::new(
             seg_lens,
             segments.clone(),
-            10.0 * std::f32::consts::PI / 180.0,
+            angle_constraints,
             head_id,
             linear_downset,
+            Vec3::new(0.0, 0.0, 1.0)
         ),
         SegmentFiller::new(segments.clone(), midpoint_segments, Vec3::Y),
     ));

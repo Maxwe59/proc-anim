@@ -36,9 +36,10 @@ revolving around the head entity. (Assuming both need the component OffSetter)
 pub struct DynamicBody {
     seg_lengths: Vec<f32>, //length between segments, vec length should be seg_count - 1
     nodes: Vec<Entity>,    //vec length should be seg_count - 1
-    angle_constraints: f32,
+    angle_constraints: Vec<f32>,
     anchor_entity: Entity,
     slope_func: fn(i32, Vec3) -> Vec3,
+    init_dir_vec: Vec3, //used to determine forward vector of the first node in the chain
 }
 
 #[derive(Component)]
@@ -67,7 +68,7 @@ pub struct FabrikJoint {
     angle_constraints: Vec<f32>,
     init_dir_vec: Vec3, //initial vector that compares for angle constraints. relative to anchor entity
 
-    //interal variables used to calculate states
+    //internal variables used to calculate states
     fabrik_iterations: i32,
     stepping: bool,        //when joint is stepping phase
     new_target_pos: Vec3, //the new foot position, when stepping is complete, curr_target becomes equal to this
@@ -81,12 +82,12 @@ pub struct FabrikJoint {
 pub struct FabrikSync {
     left_joint: Entity,
     right_joint: Entity,
-    current_joint: bool, //doesn't really matter what bool equals left/right, needed to distiguish between left/right
+    current_joint: bool, //doesn't really matter what bool equals left/right, needed to distinguish between left/right
 }
 
 impl_new!(SegmentFiller, nodes: Vec<Entity>, midpoints: Vec<Entity>, vec_dir_segment: Vec3);
 impl_new!(PivotEntity, head: Entity, offset: Vec3, child: Entity);
-impl_new!(DynamicBody, seg_lengths: Vec<f32>, nodes: Vec<Entity>, angle_constraints: f32, anchor_entity: Entity, slope_func: fn(i32, Vec3) -> Vec3);
+impl_new!(DynamicBody, seg_lengths: Vec<f32>, nodes: Vec<Entity>, angle_constraints: Vec<f32>, anchor_entity: Entity, slope_func: fn(i32, Vec3) -> Vec3, init_dir_vec: Vec3);
 impl_new!(FabrikSync, [left_joint: Entity, right_joint: Entity], [current_joint = false] );
 
 impl_new!(FabrikJoint, [
@@ -115,6 +116,7 @@ pub fn procedural_animation_plugin(app: &mut App) {
     app.add_systems(PostStartup, setup_offset).add_systems(
         Update,
         (
+            setup_offset,
             dynamic_body_calculator,
             fabrik_calculator,
             fabrik_syncer,
@@ -132,7 +134,7 @@ fn distance_restraints(pnt_static: Vec3, pnt_to_move: Vec3, distance: f32) -> Ve
 /*
 given a point_to_move and a reference point, you draw a vector from reference_vec->moved_point
 and from that vector compare to a reference vector. returns new position of point_to_move if the angle
-exheeds the angle_constraint parameter.
+exceeds the angle_constraint parameter.
 */
 
 fn calc_angle_constraints(
@@ -154,10 +156,8 @@ fn calc_angle_constraints(
     }
 }
 
-
-
 pub fn setup_offset(
-    pivot_query: Query<&PivotEntity>,
+    pivot_query: Query<&PivotEntity, Added<PivotEntity>>,
     mut commands: Commands,
     mut transforms: Query<&mut Transform>,
 ) {
@@ -170,7 +170,6 @@ pub fn setup_offset(
         transforms.get_mut(pivotter.child).unwrap().translation = Vec3::ZERO;
         //apply offset
         transforms.get_mut(pivotter.child).unwrap().translation = pivotter.offset;
-        //transforms.get_mut(pivotter.child).unwrap().translation.y += 0.5; //temporary, should be based on center of mass
     }
 }
 
@@ -187,11 +186,11 @@ pub fn dynamic_body_calculator(
         let mut first_node = transforms.get_mut(nodes[0]).unwrap();
         first_node.translation = anchor_entity_pos.translation();
         first_node.rotation = anchor_entity_pos.rotation();
-        let mut last_vec = -1.0
-            * (*global_transforms
-                .get(dynamic_body.nodes[0])
-                .unwrap()
-                .forward());
+        let mut last_vec = global_transforms
+            .get(dynamic_body.nodes[0])
+            .unwrap()
+            .rotation()
+            * dynamic_body.init_dir_vec;
 
         let mut last_node_pos = global_transforms
             .get(dynamic_body.nodes[0])
@@ -216,7 +215,7 @@ pub fn dynamic_body_calculator(
                 last_vec,
                 front_pos,
                 back_pos,
-                dynamic_body.angle_constraints,
+                dynamic_body.angle_constraints[i],
                 segment_lengths[i],
             );
             transforms.get_mut(nodes[i + 1]).unwrap().translation = new_pos;
@@ -278,7 +277,6 @@ pub fn fabrik_syncer(
 
 pub fn fabrik_calculator(
     mut fabrik_query: Query<&mut FabrikJoint>,
-    global_transforms: Query<&GlobalTransform>,
     mut param_set: ParamSet<(TransformHelper, Query<&mut Transform>)>,
 ) {
     for mut fabrik_joint in fabrik_query.iter_mut() {
@@ -287,15 +285,9 @@ pub fn fabrik_calculator(
             .compute_global_transform(fabrik_joint.anchor_entity)
             .unwrap();
         let mut transforms = param_set.p1();
-        let rotation_of_anchor = global_transforms
-            .get(fabrik_joint.anchor_entity)
-            .unwrap()
-            .rotation();
-        let updated_target = global_transforms
-            .get(fabrik_joint.anchor_entity)
-            .unwrap()
-            .translation()
-            + (rotation_of_anchor * fabrik_joint.target_offset);
+        let rotation_of_anchor = anchor_global.rotation();
+        let updated_target =
+            anchor_global.translation() + (rotation_of_anchor * fabrik_joint.target_offset);
 
         let anchor_pos = anchor_global.translation();
 
@@ -309,7 +301,7 @@ pub fn fabrik_calculator(
         }
 
         if fabrik_joint.stepping {
-            //recalculate currentmost target (because teh entire body is moving, using old target will result in incomplete step)
+            //recalculate currentmost target (because the entire body is moving, using old target will result in incomplete step)
             fabrik_joint.new_target_pos = updated_target;
             fabrik_joint.t_val += fabrik_joint.step_speed;
             fabrik_joint.curr_target_pos = fabrik_joint
@@ -325,11 +317,11 @@ pub fn fabrik_calculator(
         for _i in 0..fabrik_joint.fabrik_iterations {
             //backpass
             transforms
-                .get_mut(fabrik_joint.nodes.last().unwrap().clone())
+                .get_mut(*fabrik_joint.nodes.last().unwrap())
                 .unwrap()
                 .translation = fabrik_joint.curr_target_pos;
             for i in (0..(fabrik_joint.nodes.len() - 1)).rev() {
-                let prev_point = if (i + 2 >= fabrik_joint.nodes.len()) {
+                let prev_point = if i + 2 >= fabrik_joint.nodes.len() {
                     None
                 } else {
                     Some(
