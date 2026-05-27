@@ -174,28 +174,25 @@ pub fn setup_offset(
 }
 
 pub fn dynamic_body_calculator(
-    mut transforms: Query<&mut Transform>,
     global_transforms: Query<&GlobalTransform>,
     dynamic_body_query: Query<&DynamicBody>,
+    mut param_set: ParamSet<(TransformHelper, Query<&mut Transform>)>,
 ) {
     for dynamic_body in dynamic_body_query.iter() {
-        let anchor_entity_pos = global_transforms.get(dynamic_body.anchor_entity).unwrap();
+        let anchor_entity_pos = param_set
+            .p0()
+            .compute_global_transform(dynamic_body.anchor_entity)
+            .unwrap();
+        let mut transforms = param_set.p1();
         let nodes = &dynamic_body.nodes;
         let segment_lengths = &dynamic_body.seg_lengths;
 
         let mut first_node = transforms.get_mut(nodes[0]).unwrap();
         first_node.translation = anchor_entity_pos.translation();
         first_node.rotation = anchor_entity_pos.rotation();
-        let mut last_vec = global_transforms
-            .get(dynamic_body.nodes[0])
-            .unwrap()
-            .rotation()
-            * dynamic_body.init_dir_vec;
+        let mut last_vec = anchor_entity_pos.rotation() * dynamic_body.init_dir_vec;
 
-        let mut last_node_pos = global_transforms
-            .get(dynamic_body.nodes[0])
-            .unwrap()
-            .translation();
+        let mut last_node_pos = anchor_entity_pos.translation();
 
         let transform_func = dynamic_body.slope_func;
 
