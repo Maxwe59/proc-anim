@@ -2,6 +2,7 @@ use bevy::prelude::*;
 mod mantis;
 use mantis::create_mantis;
 mod controls;
+mod helper;
 mod proc_anim;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::window::{PresentMode, Window, WindowPlugin};
